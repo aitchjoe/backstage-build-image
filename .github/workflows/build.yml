@@ -1,0 +1,23 @@
+name: Build backstage build image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-image:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build image
+        run: |
+          export NODE_VER=18.15.0
+          export PYTHON_VER=3.8.16
+          export TECHDOCS_VER=1.1.2
+          export IMAGE=node-${NODE_VER}-python-${PYTHON_VER}-techdocs-${TECHDOCS_VER}
+          export TAG=alpine-3.17
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u aitchjoe --password-stdin
+          docker build -q . -t ghcr.io/$GITHUB_REPOSITORY/$IMAGE:$TAG
+          docker push -q ghcr.io/$GITHUB_REPOSITORY/$IMAGE:$TAG
