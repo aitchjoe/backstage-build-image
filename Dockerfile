@@ -1,9 +1,9 @@
-# https://github.com/nodejs/docker-node/blob/main/18/alpine3.17/Dockerfile
+# https://github.com/nodejs/docker-node/blob/main/18/bullseye/Dockerfile
 
-FROM docker.io/node:18.15.0-alpine3.17
+FROM docker.io/node:18.15.0-bullseye
 
 
-# https://github.com/docker-library/python/blob/master/3.8/alpine3.17/Dockerfile
+# https://github.com/docker-library/python/blob/master/3.8/bullseye/Dockerfile
 
 # ensure local python is preferred over distribution python
 ENV PATH /usr/local/bin:$PATH
@@ -14,46 +14,18 @@ ENV LANG C.UTF-8
 
 # runtime dependencies
 RUN set -eux; \
-	apk add --no-cache \
-		ca-certificates \
-		tzdata \
-	;
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		libbluetooth-dev \
+		tk-dev \
+		uuid-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
 
 ENV GPG_KEY E3FF2839C048B25C084DEBE9B26995E310250568
 ENV PYTHON_VERSION 3.8.16
 
 RUN set -eux; \
-	\
-	apk add --no-cache --virtual .build-deps \
-		gnupg \
-		tar \
-		xz \
-		\
-		bluez-dev \
-		bzip2-dev \
-		dpkg-dev dpkg \
-		expat-dev \
-		findutils \
-		gcc \
-		gdbm-dev \
-		libc-dev \
-		libffi-dev \
-		libnsl-dev \
-		libtirpc-dev \
-		linux-headers \
-		make \
-		ncurses-dev \
-		openssl-dev \
-		pax-utils \
-		readline-dev \
-		sqlite-dev \
-		tcl-dev \
-		tk \
-		tk-dev \
-		util-linux-dev \
-		xz-dev \
-		zlib-dev \
-	; \
 	\
 	wget -O python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz"; \
 	wget -O python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc"; \
@@ -78,10 +50,6 @@ RUN set -eux; \
 		--without-ensurepip \
 	; \
 	nproc="$(nproc)"; \
-# set thread stack size to 1MB so we don't segfault before we hit sys.getrecursionlimit()
-# https://github.com/alpinelinux/aports/commit/2026e1259422d4e0cf92391ca2d3844356c649d0
-	EXTRA_CFLAGS="-DTHREAD_STACK_SIZE=0x100000"; \
-	LDFLAGS="-Wl,--strip-all"; \
 	make -j "$nproc" \
 		"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}" \
 		"LDFLAGS=${LDFLAGS:-}" \
@@ -98,6 +66,12 @@ RUN set -eux; \
 	; \
 	make install; \
 	\
+# enable GDB to load debugging data: https://github.com/docker-library/python/pull/701
+	bin="$(readlink -ve /usr/local/bin/python3)"; \
+	dir="$(dirname "$bin")"; \
+	mkdir -p "/usr/share/gdb/auto-load/$dir"; \
+	cp -vL Tools/gdb/libpython.py "/usr/share/gdb/auto-load/$bin-gdb.py"; \
+	\
 	cd /; \
 	rm -rf /usr/src/python; \
 	\
@@ -109,13 +83,7 @@ RUN set -eux; \
 		\) -exec rm -rf '{}' + \
 	; \
 	\
-	find /usr/local -type f -executable -not \( -name '*tkinter*' \) -exec scanelf --needed --nobanner --format '%n#p' '{}' ';' \
-		| tr ',' '\n' \
-		| sort -u \
-		| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
-		| xargs -rt apk add --no-network --virtual .python-rundeps \
-	; \
-	apk del --no-network .build-deps; \
+	ldconfig; \
 	\
 	python3 --version
 
@@ -157,7 +125,8 @@ RUN set -eux; \
 
 # https://github.com/backstage/techdocs-container/blob/v1.1.2/Dockerfile
 
-RUN apk update && apk --no-cache add gcc musl-dev openjdk17-jdk curl graphviz ttf-dejavu fontconfig
+# RUN apk update && apk --no-cache add gcc musl-dev openjdk17-jdk curl graphviz ttf-dejavu fontconfig
+RUN apt update && apt install -y --no-install-recommends gcc musl-dev openjdk17-jdk curl graphviz ttf-dejavu fontconfig; rm -rf /var/lib/apt/lists/*
 
 # Download plantuml file, Validate checksum & Move plantuml file
 RUN curl -o plantuml.jar -L http://sourceforge.net/projects/plantuml/files/plantuml.1.2022.4.jar/download && echo "246d1ed561ebbcac14b2798b45712a9d018024c0  plantuml.jar" | sha1sum -c - && mv plantuml.jar /opt/plantuml.jar

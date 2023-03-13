@@ -17,7 +17,7 @@ jobs:
           export PYTHON_VER=3.8.16
           export TECHDOCS_VER=1.1.2
           export IMAGE=node-${NODE_VER}-python-${PYTHON_VER}-techdocs-${TECHDOCS_VER}
-          export TAG=alpine-3.17
+          export TAG=bullseye
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u aitchjoe --password-stdin
           docker build -q . -t ghcr.io/$GITHUB_REPOSITORY/$IMAGE:$TAG
           docker push -q ghcr.io/$GITHUB_REPOSITORY/$IMAGE:$TAG
